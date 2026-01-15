@@ -31,14 +31,11 @@ jest.mock('expo-av', () => ({
 // Mock expo-haptics
 jest.mock('expo-haptics', () => ({
   impactAsync: jest.fn(() => Promise.resolve()),
+  notificationAsync: jest.fn(() => Promise.resolve()),
   ImpactFeedbackStyle: {
     Heavy: 'heavy',
   },
-}));
-
-// Mock expo-notifications
-jest.mock('expo-notifications', () => ({
-  setNotificationHandler: jest.fn(),
-  requestPermissionsAsync: jest.fn(() => Promise.resolve({ status: 'granted' })),
-  scheduleNotificationAsync: jest.fn(() => Promise.resolve('notification-id')),
+  NotificationFeedbackType: {
+    Success: 'success',
+  },
 }));
