@@ -1,29 +1,49 @@
-import { useState, useRef, useEffect } from 'react';
-import { Audio } from 'expo-av';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { useAudioPlayer } from 'expo-audio';
 import { Vibration } from 'react-native';
+
+// Note: expo-audio requires a static import for assets
+const completionSound = require('../../assets/sounds/completion.mp3');
 
 export function useAudio() {
   const [isAlarmActive, setIsAlarmActive] = useState(false);
-  const soundRef = useRef<Audio.Sound | null>(null);
-  const autoStopTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const autoStopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  const player = useAudioPlayer(completionSound);
+
+  const stopAlarm = useCallback(async () => {
+    setIsAlarmActive(false);
+
+    // Stop Sound
+    try {
+      player.pause();
+      player.seekTo(0);
+    } catch {
+      // ignore
+    }
+
+    // Stop Vibration
+    Vibration.cancel();
+
+    // Clear Timeout
+    if (autoStopTimeoutRef.current) {
+      clearTimeout(autoStopTimeoutRef.current);
+      autoStopTimeoutRef.current = null;
+    }
+  }, [player]);
 
   const playAlarm = async () => {
     try {
       // Prevent multiple overlaps
       await stopAlarm();
 
-      const { sound } = await Audio.Sound.createAsync(
-        require('../../assets/sounds/completion.mp3'),
-        { isLooping: true }
-      );
-      soundRef.current = sound;
-      await sound.playAsync();
+      player.loop = true;
+      player.play();
       setIsAlarmActive(true);
 
-      // Continuous Vibration using standard Vibration API
-      // Pattern: wait 0ms, vibrate 1000ms, wait 500ms...
+      // Continuous Vibration
       const VIBRATE_PATTERN = [0, 1000, 500];
-      Vibration.vibrate(VIBRATE_PATTERN, true); // true for looping
+      Vibration.vibrate(VIBRATE_PATTERN, true);
 
       // Auto-stop after 40 seconds
       autoStopTimeoutRef.current = setTimeout(() => {
@@ -35,36 +55,12 @@ export function useAudio() {
     }
   };
 
-  const stopAlarm = async () => {
-    setIsAlarmActive(false);
-
-    // Stop Sound
-    if (soundRef.current) {
-      try {
-        await soundRef.current.stopAsync();
-        await soundRef.current.unloadAsync();
-      } catch (e) {
-          // ignore
-      }
-      soundRef.current = null;
-    }
-
-    // Stop Vibration
-    Vibration.cancel();
-
-    // Clear Timeout
-    if (autoStopTimeoutRef.current) {
-      clearTimeout(autoStopTimeoutRef.current);
-      autoStopTimeoutRef.current = null;
-    }
-  };
-
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       stopAlarm();
     };
-  }, []);
+  }, [stopAlarm]);
 
   return {
     isAlarmActive,
