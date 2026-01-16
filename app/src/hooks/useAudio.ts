@@ -13,7 +13,7 @@ export function useAudio() {
       await stopAlarm();
 
       const { sound } = await Audio.Sound.createAsync(
-        require('../../../assets/sounds/completion.mp3'),
+        require('../../assets/sounds/completion.mp3'),
         { isLooping: true }
       );
       soundRef.current = sound;

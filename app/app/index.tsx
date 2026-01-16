@@ -1,15 +1,16 @@
 import { useState, useEffect, useRef } from "react";
-import { View, Text, TouchableOpacity } from "react-native";
+import { View, Text, TouchableOpacity, TextInput, StyleSheet, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard } from "react-native";
 import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
+import { LinearGradient } from 'expo-linear-gradient';
 
-import { useTimer } from './hooks/useTimer';
-import { useAudio } from './hooks/useAudio';
-import { TimerDisplay } from './components/TimerDisplay';
-import { TimerControls } from './components/TimerControls';
-import { SettingsModal } from './components/SettingsModal';
+import { useTimer, TimerMode } from '../src/hooks/useTimer';
+import { useAudio } from '../src/hooks/useAudio';
+import { TimerDisplay } from '../src/components/TimerDisplay';
+import { TimerControls } from '../src/components/TimerControls';
+import { SettingsModal } from '../src/components/SettingsModal';
 
-// Configure notifications to show even when app is foreground
+// Configure notifications
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -22,25 +23,24 @@ Notifications.setNotificationHandler({
 
 export default function Index() {
   const { isAlarmActive, playAlarm, stopAlarm } = useAudio();
+  const [task, setTask] = useState("");
   
-  // Pass playAlarm as callback for when timer completes
   const { 
       timeRemaining, 
       streak, 
       isRunning, 
+      mode,
+      totalDuration,
       start, 
       stop, 
       reset, 
-      updateCustomTime,
-      customTime
+      switchMode,
+      updateCustomTime
   } = useTimer(playAlarm);
   
   const [modalVisible, setModalVisible] = useState(false);
-
-  // Ref to track previous alarm state to detect when it stops
   const prevAlarmActive = useRef(isAlarmActive);
 
-  // Reset timer to default 25min when alarm stops (either manually or auto-timeout)
   useEffect(() => {
     if (prevAlarmActive.current && !isAlarmActive) {
         reset();
@@ -48,58 +48,166 @@ export default function Index() {
     prevAlarmActive.current = isAlarmActive;
   }, [isAlarmActive, reset]);
 
+  const getModeColor = () => {
+    switch (mode) {
+      case TimerMode.FOCUS: return "#FF4B4B";
+      case TimerMode.SHORT_BREAK: return "#4BFF4B";
+      case TimerMode.LONG_BREAK: return "#4B4BFF";
+      default: return "#000000";
+    }
+  };
+
   return (
-    <View
-      style={{
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-        backgroundColor: "#FFFFFF",
-        padding: 20,
-      }}
-    >
-      <SettingsModal 
-        visible={modalVisible} 
-        onClose={() => setModalVisible(false)} 
-        onSave={updateCustomTime}
-        initialMinutes={Math.floor(customTime / 60)} 
-      />
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <View style={styles.container}>
+        <LinearGradient
+          colors={['#1a1a1a', '#000000']}
+          style={StyleSheet.absoluteFill}
+        />
 
-      {/* Top Bar with Settings Icon */}
-      <View style={{ position: "absolute", top: 50, right: 20, zIndex: 10 }}>
-        <TouchableOpacity onPress={() => setModalVisible(true)} style={{ padding: 8 }}>
-            <Ionicons name="settings-outline" size={28} color="#333" />
-        </TouchableOpacity>
+        <SettingsModal 
+          visible={modalVisible} 
+          onClose={() => setModalVisible(false)} 
+          onSave={updateCustomTime}
+          initialMinutes={Math.floor(totalDuration / 60)} 
+        />
+
+        {/* Top Bar */}
+        <View style={styles.topBar}>
+          <View style={styles.streakContainer}>
+            <Text style={styles.streakText}>🔥 {streak} days</Text>
+          </View>
+          <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.settingsButton}>
+              <Ionicons name="settings-outline" size={24} color="#FFF" />
+          </TouchableOpacity>
+        </View>
+
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.content}
+        >
+          {/* Mode Selector */}
+          <View style={styles.modeSelector}>
+            {[TimerMode.FOCUS, TimerMode.SHORT_BREAK, TimerMode.LONG_BREAK].map((m) => (
+              <TouchableOpacity 
+                key={m} 
+                onPress={() => switchMode(m)}
+                style={[
+                  styles.modeButton, 
+                  mode === m && { backgroundColor: getModeColor() + '33', borderColor: getModeColor() }
+                ]}
+              >
+                <Text style={[
+                  styles.modeButtonText, 
+                  mode === m && { color: getModeColor() }
+                ]}>
+                  {m === TimerMode.FOCUS ? "Focus" : m === TimerMode.SHORT_BREAK ? "Short" : "Long"}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Task Input */}
+          {!isRunning && mode === TimerMode.FOCUS && (
+            <TextInput
+              style={styles.taskInput}
+              placeholder="What are you focusing on?"
+              placeholderTextColor="#666"
+              value={task}
+              onChangeText={setTask}
+            />
+          )}
+          {isRunning && task && (
+            <Text style={styles.activeTaskText}>{task}</Text>
+          )}
+
+          {/* Timer display */}
+          <TimerDisplay 
+            timeRemaining={timeRemaining} 
+            totalDuration={totalDuration}
+            onPress={reset} 
+            modeColor={getModeColor()}
+          />
+
+          {/* Controls */}
+          <TimerControls 
+            isRunning={isRunning} 
+            onStart={start} 
+            onStop={stop} 
+            isAlarmActive={isAlarmActive}
+            onStopAlarm={stopAlarm}
+          />
+        </KeyboardAvoidingView>
       </View>
-
-      {/* Streak counter */}
-      <View style={{ position: "absolute", top: 60, left: 20 }}>
-        <Text style={{ fontSize: 18, color: "#333333" }}>
-          🔥 Streak: {streak} days
-        </Text>
-      </View>
-
-      {/* Timer display */}
-      <TimerDisplay 
-        timeRemaining={timeRemaining} 
-        onPress={reset} 
-      />
-
-      {/* Controls */}
-      <TimerControls 
-        isRunning={isRunning} 
-        onStart={start} 
-        onStop={stop} 
-        isAlarmActive={isAlarmActive}
-        onStopAlarm={stopAlarm}
-      />
-      
-      {/* Helper text */}
-      {!isRunning && !isAlarmActive && (
-          <Text style={{ marginTop: 24, color: "#888", fontSize: 14 }}>
-              Tap timer to reset
-          </Text>
-      )}
-    </View>
+    </TouchableWithoutFeedback>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#000",
+  },
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 60,
+    paddingHorizontal: 24,
+    zIndex: 10,
+  },
+  streakContainer: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+  },
+  streakText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  settingsButton: {
+    padding: 8,
+  },
+  content: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modeSelector: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 40,
+  },
+  modeButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  modeButtonText: {
+    color: '#888',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  taskInput: {
+    color: '#FFF',
+    fontSize: 18,
+    textAlign: 'center',
+    marginBottom: 30,
+    width: '80%',
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+    paddingBottom: 8,
+  },
+  activeTaskText: {
+    color: '#AAA',
+    fontSize: 20,
+    fontWeight: '500',
+    marginBottom: 30,
+  },
+});

@@ -1,34 +1,85 @@
-import { useState, useEffect, useRef } from 'react';
-import { AppState, Alert } from 'react-native';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { AppState } from 'react-native';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import * as Notifications from 'expo-notifications';
+import * as Haptics from 'expo-haptics';
 import { loadStreak, saveStreak, saveCustomTime } from '../utils/storage';
 import { calculateStreak } from '../utils/time';
 
-const DEFAULT_TIME = 1500; // 25 minutes
+export enum TimerMode {
+  FOCUS = 'FOCUS',
+  SHORT_BREAK = 'SHORT_BREAK',
+  LONG_BREAK = 'LONG_BREAK',
+}
+
+const DEFAULT_TIMES = {
+  [TimerMode.FOCUS]: 1500, // 25 minutes
+  [TimerMode.SHORT_BREAK]: 300, // 5 minutes
+  [TimerMode.LONG_BREAK]: 900, // 15 minutes
+};
 
 export function useTimer(onComplete: () => void) {
-  const [customTime, setCustomTime] = useState(DEFAULT_TIME);
-  const [timeRemaining, setTimeRemaining] = useState(DEFAULT_TIME);
+  const [mode, setMode] = useState<TimerMode>(TimerMode.FOCUS);
+  const [timeRemaining, setTimeRemaining] = useState(DEFAULT_TIMES[TimerMode.FOCUS]);
   const [isRunning, setIsRunning] = useState(false);
   const [streak, setStreak] = useState(0);
+  const [sessionCount, setSessionCount] = useState(0);
   const [lastCompletionDate, setLastCompletionDate] = useState<string | null>(null);
+  const [customTimes, setCustomTimes] = useState(DEFAULT_TIMES);
   
   const endTimeRef = useRef<number | null>(null);
   const appState = useRef(AppState.currentState);
 
-  // Load Streak only on mount.
-  // We explicitly DO NOT load custom time to enforce default 25min on reload.
+  // Load Streak on mount
   useEffect(() => {
     const initialize = async () => {
       const { streak: loadedStreak, lastCompletionDate: loadedDate } = await loadStreak();
       setStreak(loadedStreak);
       setLastCompletionDate(loadedDate);
-      
-      const { status } = await Notifications.requestPermissionsAsync();
+      await Notifications.requestPermissionsAsync();
     };
     initialize();
   }, []);
+
+  const switchMode = useCallback((newMode: TimerMode) => {
+    setMode(newMode);
+    setTimeRemaining(customTimes[newMode]);
+    setIsRunning(false);
+    endTimeRef.current = null;
+  }, [customTimes]);
+
+  const handleCompletion = useCallback(async () => {
+    setIsRunning(false);
+    setTimeRemaining(0);
+    endTimeRef.current = null;
+    deactivateKeepAwake();
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    
+    // Update streak if it was a FOCUS session
+    if (mode === TimerMode.FOCUS) {
+      const currentDate = new Date().toISOString();
+      const newStreak = calculateStreak(streak, lastCompletionDate, currentDate);
+      setStreak(newStreak);
+      setLastCompletionDate(currentDate);
+      await saveStreak(newStreak, currentDate);
+      setSessionCount(prev => prev + 1);
+    }
+
+    onComplete();
+    
+    // Auto-transition logic
+    setTimeout(() => {
+        if (mode === TimerMode.FOCUS) {
+            if ((sessionCount + 1) % 4 === 0) {
+                switchMode(TimerMode.LONG_BREAK);
+            } else {
+                switchMode(TimerMode.SHORT_BREAK);
+            }
+        } else {
+            switchMode(TimerMode.FOCUS);
+        }
+    }, 1000);
+  }, [mode, streak, lastCompletionDate, sessionCount, onComplete, switchMode]);
 
   // AppState handling
   useEffect(() => {
@@ -50,7 +101,7 @@ export function useTimer(onComplete: () => void) {
     return () => {
       subscription.remove();
     };
-  }, [isRunning]);
+  }, [isRunning, handleCompletion]);
 
   // Timer Tick
   useEffect(() => {
@@ -75,45 +126,29 @@ export function useTimer(onComplete: () => void) {
     }
 
     return () => clearInterval(intervalId);
-  }, [isRunning, timeRemaining]);
-
-  const handleCompletion = async () => {
-    setIsRunning(false);
-    setTimeRemaining(0);
-    endTimeRef.current = null;
-    deactivateKeepAwake();
-    
-    const currentDate = new Date().toISOString();
-    const newStreak = calculateStreak(streak, lastCompletionDate, currentDate);
-    
-    setStreak(newStreak);
-    setLastCompletionDate(currentDate);
-    await saveStreak(newStreak, currentDate);
-    
-    onComplete();
-  };
+  }, [isRunning, timeRemaining, handleCompletion]);
 
   const start = async () => {
-    if (timeRemaining === 0) {
-        setTimeRemaining(customTime);
-    }
     setIsRunning(true);
     await activateKeepAwakeAsync();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     
-    const duration = timeRemaining === 0 ? customTime : timeRemaining;
     const now = Date.now();
-    const targetTime = now + (duration * 1000);
+    const targetTime = now + (timeRemaining * 1000);
     endTimeRef.current = targetTime;
 
     try {
         await Notifications.cancelAllScheduledNotificationsAsync();
         await Notifications.scheduleNotificationAsync({
             content: {
-                title: "Focus Session Complete! 🎉",
-                body: "Great job! Take a break.",
+                title: mode === TimerMode.FOCUS ? "Focus Session Complete! 🎉" : "Break Over! ☕",
+                body: mode === TimerMode.FOCUS ? "Great job! Take a break." : "Ready to focus again?",
                 sound: true,
             },
-            trigger: new Date(targetTime) as any,
+            trigger: {
+                type: 'timeInterval', // Explicitly stating type if requested by error
+                seconds: Math.max(1, Math.floor((targetTime - Date.now()) / 1000)),
+            } as any,
         });
     } catch (e) {
         console.error("Notification schedule error:", e);
@@ -124,37 +159,36 @@ export function useTimer(onComplete: () => void) {
     setIsRunning(false);
     endTimeRef.current = null;
     deactivateKeepAwake();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await Notifications.cancelAllScheduledNotificationsAsync();
   };
 
   const reset = () => {
     stop();
-    // Requirement: "also reset the time and also keep the defaut time 25 min"
-    // Does this mean reset sets it to 25? Or sets it to customTime?
-    // "keep the default time 25 min... every time app reloads"
-    // I'll assume Reset button goes back to customTime (user set), BUT if we want "default 25", maybe we should reset customTime too?
-    // User said "reset the time and also keep the default time 25 min" is ambiguous.
-    // I will interpret: Reset -> Go to 25 min (Default).
-    setCustomTime(DEFAULT_TIME);
-    setTimeRemaining(DEFAULT_TIME);
+    setTimeRemaining(customTimes[mode]);
   };
 
   const updateCustomTime = async (minutes: number) => {
       const seconds = minutes * 60;
-      setCustomTime(seconds);
+      const newCustomTimes = { ...customTimes, [mode]: seconds };
+      setCustomTimes(newCustomTimes);
       setTimeRemaining(seconds);
       setIsRunning(false);
-      await saveCustomTime(seconds); // We save it, but we don't load it on mount (per requirement)
+      await saveCustomTime(seconds); 
   };
 
   return {
       timeRemaining,
       streak,
       isRunning,
-      customTime,
+      mode,
+      sessionCount,
+      totalDuration: customTimes[mode],
       start,
       stop,
       reset,
+      switchMode,
       updateCustomTime
   };
 }
+
