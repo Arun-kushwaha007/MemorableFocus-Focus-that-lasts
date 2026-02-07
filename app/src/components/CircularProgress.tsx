@@ -35,16 +35,28 @@ export function CircularProgress({ progress, size, strokeWidth, color = "#000" }
   return (
     <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
       <Svg width={size} height={size} style={styles.svg}>
-        {/* Background Circle */}
+        {/* Outer Glow / Shadow (Simulated with semi-transparent circle) */}
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius + 2}
+          stroke={color}
+          strokeWidth={1}
+          fill="transparent"
+          opacity={0.1}
+        />
+        
+        {/* Background Circle (Glass effect) */}
         <Circle
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke="#E6E6E6"
+          stroke="rgba(255,255,255,0.05)"
           strokeWidth={strokeWidth}
-          fill="transparent"
+          fill="rgba(255,255,255,0.02)"
         />
-        {/* Progress Circle */}
+        
+        {/* Main Progress Circle */}
         <AnimatedCircle
           cx={size / 2}
           cy={size / 2}
@@ -65,5 +77,9 @@ export function CircularProgress({ progress, size, strokeWidth, color = "#000" }
 const styles = StyleSheet.create({
   svg: {
     transform: [{ rotate: '0deg' }],
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
   },
 });

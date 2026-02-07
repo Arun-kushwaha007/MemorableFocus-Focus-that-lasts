@@ -7,9 +7,10 @@ interface TimerControlsProps {
     onStop: () => void;
     isAlarmActive: boolean;
     onStopAlarm: () => void;
+    modeColor: string;
 }
 
-export function TimerControls({ isRunning, onStart, onStop, isAlarmActive, onStopAlarm }: TimerControlsProps) {
+export function TimerControls({ isRunning, onStart, onStop, isAlarmActive, onStopAlarm, modeColor }: TimerControlsProps) {
     if (isAlarmActive) {
         return (
             <View style={styles.container}>
@@ -28,10 +29,13 @@ export function TimerControls({ isRunning, onStart, onStop, isAlarmActive, onSto
     return (
         <View style={styles.container}>
             <TouchableOpacity
-                style={[styles.button, isRunning ? styles.stopButton : styles.startButton]}
+                style={[
+                    styles.button, 
+                    isRunning ? styles.stopButton : { backgroundColor: modeColor }
+                ]}
                 onPress={isRunning ? onStop : onStart}
             >
-                <Text style={styles.buttonText}>
+                <Text style={[styles.buttonText, !isRunning && { color: '#000' }]}>
                     {isRunning ? "Stop" : "Start"}
                 </Text>
             </TouchableOpacity>
@@ -43,39 +47,44 @@ const styles = StyleSheet.create({
     container: {
         flexDirection: "row",
         gap: 20,
+        marginTop: 20,
     },
     button: {
         paddingVertical: 18,
-        paddingHorizontal: 64,
-        borderRadius: 30,
+        paddingHorizontal: 80,
+        borderRadius: 35,
         alignItems: 'center',
         justifyContent: 'center',
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 10,
+        elevation: 10,
     },
     startButton: {
-        backgroundColor: '#FFF',
+        // Dynamic color now
     },
     stopButton: {
-        backgroundColor: 'rgba(255,255,255,0.1)',
+        backgroundColor: 'rgba(255,255,255,0.08)',
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.2)',
+        borderColor: 'rgba(255,255,255,0.1)',
     },
     alarmButton: {
         backgroundColor: "#FF3B30",
         shadowColor: "#FF3B30",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 5
+        paddingHorizontal: 60,
     },
     buttonText: {
-        color: "#000",
+        color: "#FFF",
         fontSize: 18,
-        fontWeight: "700",
-        letterSpacing: 0.5,
+        fontWeight: "800",
+        letterSpacing: 1,
+        textTransform: 'uppercase',
     },
     alarmButtonText: {
         color: "#FFF",
         fontSize: 20,
-        fontWeight: "800",
+        fontWeight: "900",
+        letterSpacing: 1,
     },
 });

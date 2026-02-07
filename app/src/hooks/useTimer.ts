@@ -139,14 +139,16 @@ export function useTimer(onComplete: () => void) {
 
     try {
         await Notifications.cancelAllScheduledNotificationsAsync();
+        
+        // Schedule completion notification
         await Notifications.scheduleNotificationAsync({
             content: {
                 title: mode === TimerMode.FOCUS ? "Focus Session Complete! 🎉" : "Break Over! ☕",
                 body: mode === TimerMode.FOCUS ? "Great job! Take a break." : "Ready to focus again?",
-                sound: true,
+                sound: 'default',
             },
             trigger: {
-                type: 'timeInterval', // Explicitly stating type if requested by error
+                type: 'timeInterval',
                 seconds: Math.max(1, Math.floor((targetTime - Date.now()) / 1000)),
             } as any,
         });

@@ -9,6 +9,7 @@ import {
     Keyboard,
     StyleSheet
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 interface SettingsModalProps {
     visible: boolean;
@@ -29,7 +30,6 @@ export function SettingsModal({ visible, onClose, onSave, initialMinutes = 25 }:
     const handleSave = () => {
         const minutes = parseInt(inputMinutes, 10);
         if (isNaN(minutes) || minutes <= 0) {
-            alert("Please enter a valid number of minutes."); 
             return;
         }
         onSave(minutes);
@@ -46,8 +46,14 @@ export function SettingsModal({ visible, onClose, onSave, initialMinutes = 25 }:
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
                 <View style={styles.overlay}>
                     <View style={styles.modalContent}>
-                        <Text style={styles.title}>Set Timer Duration</Text>
-                        <Text style={styles.label}>Minutes:</Text>
+                        <View style={styles.header}>
+                          <Text style={styles.title}>Settings</Text>
+                          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                            <Ionicons name="close" size={24} color="rgba(255,255,255,0.5)" />
+                          </TouchableOpacity>
+                        </View>
+
+                        <Text style={styles.label}>FOCUS DURATION (MINS)</Text>
                         <TextInput 
                             style={styles.input}
                             keyboardType="number-pad"
@@ -55,21 +61,15 @@ export function SettingsModal({ visible, onClose, onSave, initialMinutes = 25 }:
                             onChangeText={setInputMinutes}
                             maxLength={3}
                             placeholderTextColor="#666"
+                            selectionColor="#FF4D4D"
                         />
-                        <View style={styles.buttonContainer}>
-                            <TouchableOpacity 
-                                onPress={onClose}
-                                style={[styles.button, styles.cancelButton]}
-                            >
-                                <Text style={styles.cancelButtonText}>Cancel</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity 
-                                onPress={handleSave}
-                                style={[styles.button, styles.saveButton]}
-                            >
-                                <Text style={styles.saveButtonText}>Save</Text>
-                            </TouchableOpacity>
-                        </View>
+
+                        <TouchableOpacity 
+                            onPress={handleSave}
+                            style={styles.saveButton}
+                        >
+                            <Text style={styles.saveButtonText}>Apply Changes</Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
             </TouchableWithoutFeedback>
@@ -82,65 +82,70 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: "center",
         alignItems: "center",
-        backgroundColor: "rgba(0,0,0,0.8)",
+        backgroundColor: "rgba(0,0,0,0.7)",
     },
     modalContent: {
         width: '85%',
-        backgroundColor: "#1a1a1a",
-        borderRadius: 24,
+        backgroundColor: "rgba(30,30,30,0.95)",
+        borderRadius: 32,
         padding: 24,
         borderWidth: 1,
-        borderColor: "#333",
+        borderColor: "rgba(255,255,255,0.1)",
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 20 },
+        shadowOpacity: 0.5,
+        shadowRadius: 30,
+        elevation: 20,
+    },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 30,
     },
     title: {
-        fontSize: 22,
-        fontWeight: "700",
+        fontSize: 24,
+        fontWeight: "800",
         color: "#FFF",
-        marginBottom: 20,
-        textAlign: "center",
+        letterSpacing: 0.5,
+    },
+    closeButton: {
+        padding: 4,
     },
     label: {
-        fontSize: 14,
-        color: "#888",
-        marginBottom: 8,
-        fontWeight: '600',
+        fontSize: 12,
+        color: "rgba(255,255,255,0.5)",
+        marginBottom: 12,
+        fontWeight: '800',
+        letterSpacing: 1.5,
     },
     input: {
-        backgroundColor: "#222",
-        borderRadius: 12,
-        padding: 16,
-        fontSize: 24,
+        backgroundColor: "rgba(255,255,255,0.05)",
+        borderRadius: 20,
+        padding: 20,
+        fontSize: 32,
         color: "#FFF",
-        marginBottom: 24,
+        marginBottom: 30,
         textAlign: "center",
+        fontWeight: '700',
         borderWidth: 1,
-        borderColor: "#444",
-    },
-    buttonContainer: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        gap: 12,
-    },
-    button: {
-        flex: 1,
-        padding: 16,
-        borderRadius: 12,
-        alignItems: "center",
-    },
-    cancelButton: {
-        backgroundColor: "#222",
+        borderColor: "rgba(255,255,255,0.08)",
     },
     saveButton: {
         backgroundColor: "#FFF",
-    },
-    cancelButtonText: {
-        color: "#AAA",
-        fontWeight: "600",
-        fontSize: 16,
+        padding: 18,
+        borderRadius: 20,
+        alignItems: "center",
+        shadowColor: "#FFF",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 10,
     },
     saveButtonText: {
         color: "#000",
-        fontWeight: "700",
+        fontWeight: "800",
         fontSize: 16,
+        textTransform: 'uppercase',
+        letterSpacing: 1,
     },
 });
